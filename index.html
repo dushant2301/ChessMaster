@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Master - Complete Chess with Castling</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header Navigation -->
+    <header class="header">
+        <div class="container">
+            <div class="nav-wrapper">
+                <div class="nav-brand">
+                    <h1 class="logo">♔ Chess Master</h1>
+                </div>
+                <nav class="nav-menu">
+                    <button class="nav-btn active" data-mode="play">Play</button>
+                    <button class="nav-btn" data-mode="puzzles">Puzzles</button>
+                    <button class="nav-btn" data-mode="analysis">Analysis</button>
+                    <button class="nav-btn" id="settingsBtn">Settings</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Container -->
+    <main class="main-container">
+        <!-- Welcome Screen -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-content">
+                <h2>Welcome to Chess Master</h2>
+                <p>Complete chess with all official rules including castling</p>
+                <div class="game-mode-buttons">
+                    <button class="btn btn--primary btn--lg" id="playAI">Play vs AI</button>
+                    <button class="btn btn--secondary btn--lg" id="playLocal">2 Player Local</button>
+                    <button class="btn btn--outline btn--lg" id="solvePuzzles">Solve Puzzles</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Setup Modal -->
+        <div class="modal hidden" id="gameSetupModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Game Setup</h3>
+                    <button class="close-btn" id="closeSetup">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Difficulty</label>
+                        <select class="form-control" id="difficultySelect">
+                            <option value="0">Easy - Beginner friendly</option>
+                            <option value="1" selected>Medium - Intermediate challenge</option>
+                            <option value="2">Hard - Advanced opponent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Time Control</label>
+                        <select class="form-control" id="timeControlSelect">
+                            <option value="0">Bullet - 1 minute</option>
+                            <option value="1" selected>Blitz - 3 minutes</option>
+                            <option value="2">Rapid - 10 minutes</option>
+                            <option value="3">Classical - 30 minutes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Your Color</label>
+                        <select class="form-control" id="colorSelect">
+                            <option value="white" selected>Play as White</option>
+                            <option value="black">Play as Black</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn--primary" id="startGame">Start Game</button>
+                    <button class="btn btn--secondary" id="cancelSetup">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Interface -->
+        <div class="game-interface hidden" id="gameInterface">
+            <div class="game-layout">
+                <!-- Player Info Top -->
+                <div class="player-info player-info--top">
+                    <div class="player-details">
+                        <span class="player-name" id="opponentName">Opponent</span>
+                        <span class="player-rating" id="opponentRating">1500</span>
+                    </div>
+                    <div class="captured-pieces" id="capturedByPlayer"></div>
+                    <div class="player-timer">
+                        <span class="timer" id="opponentTimer">10:00</span>
+                    </div>
+                </div>
+
+                <!-- Main Game Area -->
+                <div class="game-main">
+                    <!-- Chess Board -->
+                    <div class="board-container">
+                        <div class="board-wrapper">
+                            <div class="chess-board" id="chessBoard"></div>
+                            <div class="board-coordinates">
+                                <div class="files">
+                                    <span>a</span><span>b</span><span>c</span><span>d</span>
+                                    <span>e</span><span>f</span><span>g</span><span>h</span>
+                                </div>
+                                <div class="ranks">
+                                    <span>8</span><span>7</span><span>6</span><span>5</span>
+                                    <span>4</span><span>3</span><span>2</span><span>1</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="board-controls">
+                            <button class="btn btn--sm" id="flipBoard">Flip Board</button>
+                            <button class="btn btn--sm" id="undoMove">Undo</button>
+                            <button class="btn btn--sm" id="resignGame">Resign</button>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar -->
+                    <div class="sidebar">
+                        <div class="sidebar-section">
+                            <h4>Move History</h4>
+                            <div class="move-history" id="moveHistory"></div>
+                        </div>
+                        <div class="sidebar-section">
+                            <h4>Game Status</h4>
+                            <div class="game-status" id="gameStatus">
+                                <div class="status status--info">White to move</div>
+                            </div>
+                        </div>
+                        <div class="sidebar-section">
+                            <h4>Castling Rights</h4>
+                            <div class="castling-rights" id="castlingRights">
+                                <div class="castling-status">
+                                    <span class="castling-label">White:</span>
+                                    <span class="castling-indicator" id="whiteKingside">K</span>
+                                    <span class="castling-indicator" id="whiteQueenside">Q</span>
+                                </div>
+                                <div class="castling-status">
+                                    <span class="castling-label">Black:</span>
+                                    <span class="castling-indicator" id="blackKingside">k</span>
+                                    <span class="castling-indicator" id="blackQueenside">q</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sidebar-section">
+                            <h4>Analysis</h4>
+                            <div class="analysis-panel" id="analysisPanel">
+                                <p class="analysis-suggestion" id="analysisSuggestion">Make your move...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player Info Bottom -->
+                <div class="player-info player-info--bottom">
+                    <div class="player-details">
+                        <span class="player-name" id="playerName">You</span>
+                        <span class="player-rating" id="playerRating">1200</span>
+                    </div>
+                    <div class="captured-pieces" id="capturedByOpponent"></div>
+                    <div class="player-timer">
+                        <span class="timer" id="playerTimer">10:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Puzzle Interface -->
+        <div class="puzzle-interface hidden" id="puzzleInterface">
+            <div class="puzzle-header">
+                <h3>Chess Puzzles</h3>
+                <div class="puzzle-info">
+                    <span class="puzzle-theme" id="puzzleTheme">Tactical</span>
+                    <span class="puzzle-difficulty" id="puzzleDifficulty">Easy</span>
+                </div>
+            </div>
+            <div class="puzzle-main">
+                <div class="puzzle-board-container">
+                    <div class="chess-board" id="puzzleBoard"></div>
+                </div>
+                <div class="puzzle-controls">
+                    <button class="btn btn--primary" id="nextPuzzle">Next Puzzle</button>
+                    <button class="btn btn--secondary" id="hintButton">Hint</button>
+                    <button class="btn btn--outline" id="backToMenu">Back to Menu</button>
+                </div>
+            </div>
+            <div class="puzzle-status" id="puzzleStatus">
+                <p>Find the best move for White</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Pawn Promotion Modal -->
+    <div class="modal hidden" id="promotionModal">
+        <div class="modal-content promotion-modal">
+            <div class="modal-header">
+                <h3>Choose Promotion Piece</h3>
+            </div>
+            <div class="modal-body">
+                <div class="promotion-pieces" id="promotionPieces">
+                    <div class="promotion-piece" data-piece="queen">♕</div>
+                    <div class="promotion-piece" data-piece="rook">♖</div>
+                    <div class="promotion-piece" data-piece="bishop">♗</div>
+                    <div class="promotion-piece" data-piece="knight">♘</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Result Modal -->
+    <div class="modal hidden" id="gameResultModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="resultTitle">Game Over</h3>
+                <button class="close-btn" id="closeResult">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="result-content">
+                    <div class="result-message" id="resultMessage"></div>
+                    <div class="game-summary" id="gameSummary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="newGame">New Game</button>
+                <button class="btn btn--secondary" id="exportPGN">Export PGN</button>
+                <button class="btn btn--outline" id="reviewGame">Review Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal hidden" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="close-btn" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Board Theme</label>
+                    <select class="form-control" id="boardTheme">
+                        <option value="green" selected>Chess.com Classic</option>
+                        <option value="wood">Wood</option>
+                        <option value="blue">Blue</option>
+                        <option value="dark">Dark</option>
+                        <option value="marble">Marble</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Piece Style</label>
+                    <select class="form-control" id="pieceStyle">
+                        <option value="standard" selected>Standard</option>
+                        <option value="classic">Classic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sound Effects</label>
+                    <select class="form-control" id="soundEffects">
+                        <option value="on" selected>On</option>
+                        <option value="off">Off</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Show Legal Moves</label>
+                    <select class="form-control" id="showLegalMoves">
+                        <option value="on" selected>On</option>
+                        <option value="off">Off</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn--primary" id="saveSettings">Save</button>
+                <button class="btn btn--secondary" id="cancelSettings">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen hidden" id="loadingScreen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>AI is thinking...</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
