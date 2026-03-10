@@ -772,6 +772,7 @@ select.form-control {
   --chess-selected: rgba(255, 255, 0, 0.8);
   --chess-check: rgba(255, 0, 0, 0.6);
   --chess-castle-move: rgba(0, 150, 255, 0.5);
+  --chess-last-move: rgba(255, 215, 0, 0.45);
   --piece-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
@@ -1118,6 +1119,10 @@ select.form-control {
 
 .chess-square.in-check {
   background-color: var(--chess-check) !important;
+}
+
+.chess-square.last-move {
+  background-color: var(--chess-last-move) !important;
 }
 
 /* Chess Pieces */

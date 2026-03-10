@@ -27,6 +27,12 @@ class ChessGame {
         this.halfmoveClock = 0;
         this.fullmoveNumber = 1;
         
+        // Last move tracking (for highlighting)
+        this.lastMove = null;
+        
+        // Board history for undo
+        this.boardHistory = [];
+        
         // Game settings
         this.settings = {
             boardTheme: 'green',
@@ -98,6 +104,8 @@ class ChessGame {
         this.selectedSquare = null;
         this.legalMoves = [];
         this.promotionMove = null;
+        this.lastMove = null;
+        this.boardHistory = [];
     }
     
     isValidPosition(row, col) {
@@ -391,6 +399,16 @@ class ChessGame {
         this.board[toRow][toCol] = piece;
         this.board[fromRow][fromCol] = null;
         
+        // Handle en passant - the captured pawn is not on the destination square
+        let epCaptureRow = -1;
+        let epCapturedPiece = null;
+        if (piece.type === 'pawn' && this.enPassantTarget &&
+            this.enPassantTarget.row === toRow && this.enPassantTarget.col === toCol) {
+            epCaptureRow = piece.color === 'white' ? toRow + 1 : toRow - 1;
+            epCapturedPiece = this.board[epCaptureRow][toCol];
+            this.board[epCaptureRow][toCol] = null;
+        }
+        
         if (piece.type === 'king') {
             this.kingPositions[piece.color] = { row: toRow, col: toCol };
         }
@@ -400,6 +418,9 @@ class ChessGame {
         // Undo move
         this.board[fromRow][fromCol] = piece;
         this.board[toRow][toCol] = captured;
+        if (epCaptureRow >= 0) {
+            this.board[epCaptureRow][toCol] = epCapturedPiece;
+        }
         this.kingPositions[piece.color] = oldKingPos;
         
         return inCheck;
@@ -433,6 +454,10 @@ class ChessGame {
     
     executeMoveInternal(fromRow, fromCol, toRow, toCol, move, promotionPiece = 'queen') {
         const piece = this.board[fromRow][fromCol];
+        
+        // Save board snapshot for undo before making the move (keep max 100 snapshots)
+        if (this.boardHistory.length >= 100) this.boardHistory.shift();
+        this.boardHistory.push(this.getBoardSnapshot());
         
         // Store move information for history
         const moveInfo = {
@@ -559,6 +584,9 @@ class ChessGame {
         } else if (this.isStalemate() || this.isDraw()) {
             this.isGameOver = true;
         }
+        
+        // Track last move for highlighting
+        this.lastMove = { from: { row: fromRow, col: fromCol }, to: { row: toRow, col: toCol } };
         
         return true;
     }
@@ -692,6 +720,41 @@ class ChessGame {
         }
         return moves;
     }
+    
+    getBoardSnapshot() {
+        return {
+            board: this.board.map(row => row.map(cell => cell ? { ...cell } : null)),
+            currentPlayer: this.currentPlayer,
+            castlingRights: JSON.parse(JSON.stringify(this.castlingRights)),
+            hasKingMoved: { ...this.hasKingMoved },
+            hasRookMoved: JSON.parse(JSON.stringify(this.hasRookMoved)),
+            enPassantTarget: this.enPassantTarget ? { ...this.enPassantTarget } : null,
+            halfmoveClock: this.halfmoveClock,
+            fullmoveNumber: this.fullmoveNumber,
+            kingPositions: JSON.parse(JSON.stringify(this.kingPositions)),
+            capturedPieces: {
+                white: this.capturedPieces.white.map(p => ({ ...p })),
+                black: this.capturedPieces.black.map(p => ({ ...p }))
+            },
+            isGameOver: this.isGameOver,
+            lastMove: this.lastMove ? { ...this.lastMove, from: { ...this.lastMove.from }, to: { ...this.lastMove.to } } : null
+        };
+    }
+    
+    restoreBoardSnapshot(snapshot) {
+        this.board = snapshot.board;
+        this.currentPlayer = snapshot.currentPlayer;
+        this.castlingRights = snapshot.castlingRights;
+        this.hasKingMoved = snapshot.hasKingMoved;
+        this.hasRookMoved = snapshot.hasRookMoved;
+        this.enPassantTarget = snapshot.enPassantTarget;
+        this.halfmoveClock = snapshot.halfmoveClock;
+        this.fullmoveNumber = snapshot.fullmoveNumber;
+        this.kingPositions = snapshot.kingPositions;
+        this.capturedPieces = snapshot.capturedPieces;
+        this.isGameOver = snapshot.isGameOver;
+        this.lastMove = snapshot.lastMove;
+    }
 }
 
 // UI Controller
@@ -701,6 +764,15 @@ class ChessUI {
         this.draggedPiece = null;
         this.draggedFrom = null;
         this.boardFlipped = false;
+        
+        // Timer state
+        this.timers = { white: 600, black: 600 }; // seconds (default 10 min)
+        this.timerInterval = null;
+        this.activeTimer = null;
+        this.timeoutColor = null;
+        this.timersEnabled = false; // set to true when a game with timers starts
+        // Maps select index → seconds: Bullet=60, Blitz=180, Rapid=600, Classical=1800
+        this.timeControlValues = [60, 180, 600, 1800];
         
         console.log('Initializing Chess UI...');
         this.init();
@@ -917,6 +989,14 @@ class ChessUI {
         this.renderBoard();
         this.updateGameInfo();
         this.updateCastlingRights();
+        
+        // Initialize timers with default 10-minute control for local games
+        const timeSeconds = this.timeControlValues[2]; // Rapid - 10 min
+        this.timers = { white: timeSeconds, black: timeSeconds };
+        this.timeoutColor = null;
+        this.timersEnabled = true;
+        this.startClock('white');
+        
         console.log('Local game started successfully');
     }
     
@@ -925,6 +1005,7 @@ class ChessUI {
         try {
             const difficulty = parseInt(document.getElementById('difficultySelect')?.value) || 1;
             const color = document.getElementById('colorSelect')?.value || 'white';
+            const timeControlIndex = parseInt(document.getElementById('timeControlSelect')?.value) || 1;
             
             this.game.aiSettings = { difficulty, color: color === 'white' ? 'black' : 'white' };
             
@@ -938,6 +1019,13 @@ class ChessUI {
             this.renderBoard();
             this.updateGameInfo();
             this.updateCastlingRights();
+            
+            // Initialize timers from selected time control
+            const timeSeconds = this.timeControlValues[timeControlIndex];
+            this.timers = { white: timeSeconds, black: timeSeconds };
+            this.timeoutColor = null;
+            this.timersEnabled = true;
+            this.startClock('white');
             
             // If AI plays white, make first move
             if (this.game.aiSettings.color === 'white') {
@@ -992,15 +1080,17 @@ class ChessUI {
             
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    const displayRow = this.boardFlipped ? 7 - row : row;
-                    const displayCol = this.boardFlipped ? 7 - col : col;
+                    // When flipped, reverse both row and col so black plays from bottom
+                    const boardRow = this.boardFlipped ? 7 - row : row;
+                    const boardCol = this.boardFlipped ? 7 - col : col;
                     
                     const square = document.createElement('div');
-                    square.className = `chess-square ${(displayRow + displayCol) % 2 === 0 ? 'light' : 'dark'}`;
-                    square.dataset.row = row;
-                    square.dataset.col = col;
+                    square.className = `chess-square ${(boardRow + boardCol) % 2 === 0 ? 'light' : 'dark'}`;
+                    // Store actual board coordinates so click/drag handlers work correctly
+                    square.dataset.row = boardRow;
+                    square.dataset.col = boardCol;
                     
-                    const piece = this.game.board[row][col];
+                    const piece = this.game.board[boardRow][boardCol];
                     if (piece) {
                         const pieceElement = document.createElement('div');
                         pieceElement.className = `chess-piece ${piece.color}`;
@@ -1066,8 +1156,10 @@ class ChessUI {
                     this.updateGameInfo();
                     this.updateMoveHistory();
                     this.updateCastlingRights();
+                    this.switchClock();
                     
                     if (this.game.isGameOver) {
+                        this.stopClock();
                         setTimeout(() => this.showGameResult(), 500);
                     } else if (this.game.gameMode === 'ai' && this.game.currentPlayer === this.game.aiSettings?.color) {
                         setTimeout(() => this.makeAIMove(), 500);
@@ -1173,8 +1265,10 @@ class ChessUI {
                 this.updateGameInfo();
                 this.updateMoveHistory();
                 this.updateCastlingRights();
+                this.switchClock();
                 
                 if (this.game.isGameOver) {
+                    this.stopClock();
                     setTimeout(() => this.showGameResult(), 500);
                 } else if (this.game.gameMode === 'ai' && this.game.currentPlayer === this.game.aiSettings?.color) {
                     setTimeout(() => this.makeAIMove(), 500);
@@ -1217,8 +1311,10 @@ class ChessUI {
                 this.updateGameInfo();
                 this.updateMoveHistory();
                 this.updateCastlingRights();
+                this.switchClock();
                 
                 if (this.game.isGameOver) {
+                    this.stopClock();
                     setTimeout(() => this.showGameResult(), 500);
                 } else if (this.game.gameMode === 'ai' && this.game.currentPlayer === this.game.aiSettings?.color) {
                     setTimeout(() => this.makeAIMove(), 500);
@@ -1232,8 +1328,17 @@ class ChessUI {
             const squares = document.querySelectorAll('.chess-square');
             
             squares.forEach(square => {
-                square.classList.remove('selected', 'legal-move', 'capture-move', 'castle-move', 'in-check');
+                square.classList.remove('selected', 'legal-move', 'capture-move', 'castle-move', 'in-check', 'last-move');
             });
+            
+            // Highlight last move
+            if (this.game.lastMove) {
+                const { from, to } = this.game.lastMove;
+                const fromSquare = document.querySelector(`[data-row="${from.row}"][data-col="${from.col}"]`);
+                const toSquare = document.querySelector(`[data-row="${to.row}"][data-col="${to.col}"]`);
+                if (fromSquare) fromSquare.classList.add('last-move');
+                if (toSquare) toSquare.classList.add('last-move');
+            }
             
             if (this.game.selectedSquare) {
                 const selectedSquare = document.querySelector(
@@ -1324,8 +1429,10 @@ class ChessUI {
                             this.updateGameInfo();
                             this.updateMoveHistory();
                             this.updateCastlingRights();
+                            this.switchClock();
                             
                             if (this.game.isGameOver) {
+                                this.stopClock();
                                 setTimeout(() => this.showGameResult(), 500);
                             }
                         }
@@ -1441,20 +1548,54 @@ class ChessUI {
     }
     
     undoMove() {
-        alert('Undo move - not implemented yet');
+        if (this.game.boardHistory.length === 0) return;
+        
+        // In AI mode, undo both the AI's last move and the player's move before it.
+        // boardHistory stores the state BEFORE each move, so we discard the snapshot
+        // saved before the AI move (not needed) and restore the one saved before the
+        // player's move.
+        if (this.game.gameMode === 'ai' && this.game.boardHistory.length >= 2) {
+            this.game.boardHistory.pop();  // discard AI pre-move snapshot
+            this.game.moveHistory.pop();   // remove AI move notation
+            this.game.restoreBoardSnapshot(this.game.boardHistory.pop()); // restore to before player's move
+            this.game.moveHistory.pop();   // remove player move notation
+        } else {
+            this.game.restoreBoardSnapshot(this.game.boardHistory.pop());
+            this.game.moveHistory.pop();
+        }
+        
+        this.game.selectedSquare = null;
+        this.game.legalMoves = [];
+        
+        // Resume the correct player's timer after undo (if timers were enabled)
+        if (this.timersEnabled) {
+            this.startClock(this.game.currentPlayer);
+        }
+        
+        this.renderBoard();
+        this.updateGameInfo();
+        this.updateMoveHistory();
+        this.updateCastlingRights();
     }
     
     resignGame() {
+        this.stopClock();
         this.game.isGameOver = true;
         this.showGameResult();
     }
     
     showGameResult() {
         try {
+            this.stopClock();
+            
             let title = 'Game Over';
             let message = '';
             
-            if (this.game.isCheckmate(this.game.currentPlayer)) {
+            if (this.timeoutColor) {
+                const winner = this.timeoutColor === 'white' ? 'Black' : 'White';
+                title = 'Time Out!';
+                message = `${winner} wins on time`;
+            } else if (this.game.isCheckmate(this.game.currentPlayer)) {
                 const winner = this.game.currentPlayer === 'white' ? 'Black' : 'White';
                 title = 'Checkmate!';
                 message = `${winner} wins by checkmate`;
@@ -1487,6 +1628,9 @@ class ChessUI {
     }
     
     startNewGame() {
+        this.stopClock();
+        this.timersEnabled = false;
+        this.timeoutColor = null;
         this.hideModal('gameResultModal');
         if (this.game.gameMode === 'ai') {
             this.showGameSetup('ai');
@@ -1497,8 +1641,34 @@ class ChessUI {
     
     exportGame() {
         try {
-            const pgn = '[Event "Chess Master Game"]\n[Result "*"]\n\n';
-            alert('PGN: ' + pgn);
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            let pgn = `[Event "Chess Master Game"]\n`;
+            pgn += `[Date "${dateStr}"]\n`;
+            pgn += `[White "White"]\n`;
+            pgn += `[Black "Black"]\n`;
+            pgn += `[Result "*"]\n\n`;
+            
+            for (let i = 0; i < this.game.moveHistory.length; i += 2) {
+                const moveNum = Math.floor(i / 2) + 1;
+                pgn += `${moveNum}. ${this.game.moveHistory[i].notation}`;
+                if (i + 1 < this.game.moveHistory.length) {
+                    pgn += ` ${this.game.moveHistory[i + 1].notation}`;
+                }
+                pgn += ' ';
+            }
+            pgn += '*';
+            
+            // Copy to clipboard if available, otherwise show in alert
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(pgn).then(() => {
+                    alert('PGN copied to clipboard!');
+                }).catch(() => {
+                    alert(pgn);
+                });
+            } else {
+                alert(pgn);
+            }
         } catch (error) {
             console.error('Error exporting game:', error);
             alert('Export feature requires modern browser support');
@@ -1509,6 +1679,77 @@ class ChessUI {
         alert('Review game - feature coming soon');
         this.hideModal('gameResultModal');
     }
+    
+    // ── Timer Methods ──────────────────────────────────────────────────────────
+    
+    startClock(color) {
+        this.stopClock();
+        this.activeTimer = color;
+        this.updateTimerDisplay();
+        this.timerInterval = setInterval(() => {
+            if (this.timers[this.activeTimer] > 0) {
+                this.timers[this.activeTimer]--;
+                this.updateTimerDisplay();
+                if (this.timers[this.activeTimer] <= 0) {
+                    this.stopClock();
+                    this.handleTimeOut(this.activeTimer);
+                }
+            }
+        }, 1000);
+    }
+    
+    stopClock() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+        this.activeTimer = null;
+        this.updateTimerDisplay();
+    }
+    
+    switchClock() {
+        // Only switch if timers are running (activeTimer was set when game started)
+        if (this.game.isGameOver) {
+            this.stopClock();
+            return;
+        }
+        // Start the clock for whoever's turn it now is
+        this.startClock(this.game.currentPlayer);
+    }
+    
+    formatTime(seconds) {
+        if (seconds <= 0) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    updateTimerDisplay() {
+        const playerTimerEl = document.getElementById('playerTimer');
+        const opponentTimerEl = document.getElementById('opponentTimer');
+        
+        // playerTimer (bottom) = white; opponentTimer (top) = black
+        if (playerTimerEl) {
+            playerTimerEl.textContent = this.formatTime(this.timers.white);
+            playerTimerEl.className = 'timer' +
+                (this.activeTimer === 'white' ? ' active' : '') +
+                (this.timers.white > 0 && this.timers.white <= 30 ? ' low-time' : '');
+        }
+        if (opponentTimerEl) {
+            opponentTimerEl.textContent = this.formatTime(this.timers.black);
+            opponentTimerEl.className = 'timer' +
+                (this.activeTimer === 'black' ? ' active' : '') +
+                (this.timers.black > 0 && this.timers.black <= 30 ? ' low-time' : '');
+        }
+    }
+    
+    handleTimeOut(color) {
+        this.game.isGameOver = true;
+        this.timeoutColor = color;
+        this.showGameResult();
+    }
+    
+    // ── Settings Methods ───────────────────────────────────────────────────────
     
     showSettings() {
         try {
