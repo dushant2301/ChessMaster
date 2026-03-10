@@ -36,7 +36,7 @@ class ChessGame {
         // Game settings
         this.settings = {
             boardTheme: 'green',
-            pieceStyle: 'standard',
+            pieceStyle: 'classic',
             soundEffects: 'on',
             showLegalMoves: 'on'
         };
@@ -46,17 +46,27 @@ class ChessGame {
         this.legalMoves = [];
         this.promotionMove = null;
         
-        // Unicode piece symbols
-        this.pieceSymbols = {
-            'white': {
-                'king': '♔', 'queen': '♕', 'rook': '♖',
-                'bishop': '♗', 'knight': '♘', 'pawn': '♙'
+        // Piece symbol sets for each style
+        this.pieceSymbolSets = {
+            // Classic – standard Unicode outline/filled glyphs
+            'classic': {
+                'white': { 'king': '♔', 'queen': '♕', 'rook': '♖', 'bishop': '♗', 'knight': '♘', 'pawn': '♙' },
+                'black': { 'king': '♚', 'queen': '♛', 'rook': '♜', 'bishop': '♝', 'knight': '♞', 'pawn': '♟' }
             },
-            'black': {
-                'king': '♚', 'queen': '♛', 'rook': '♜',
-                'bishop': '♝', 'knight': '♞', 'pawn': '♟'
+            // Modern – outline glyphs for white, filled for black; CSS provides the 3D shading
+            'modern': {
+                'white': { 'king': '♔', 'queen': '♕', 'rook': '♖', 'bishop': '♗', 'knight': '♘', 'pawn': '♙' },
+                'black': { 'king': '♚', 'queen': '♛', 'rook': '♜', 'bishop': '♝', 'knight': '♞', 'pawn': '♟' }
+            },
+            // Letter – K/Q/R/B/N/P text inside CSS circle badges
+            'letter': {
+                'white': { 'king': 'K', 'queen': 'Q', 'rook': 'R', 'bishop': 'B', 'knight': 'N', 'pawn': 'P' },
+                'black': { 'king': 'K', 'queen': 'Q', 'rook': 'R', 'bishop': 'B', 'knight': 'N', 'pawn': 'P' }
             }
         };
+        
+        // Active piece symbol set (updated when settings change)
+        this.pieceSymbols = this.pieceSymbolSets['classic'];
         
         this.initializeBoard();
     }
@@ -781,6 +791,7 @@ class ChessUI {
     async init() {
         await this.waitForDOM();
         this.setupEventListeners();
+        this.initTheme();
         this.showWelcomeScreen();
         console.log('Chess UI initialized successfully');
     }
@@ -859,6 +870,15 @@ class ChessUI {
         const closeSettings = document.getElementById('closeSettings');
         const saveSettings = document.getElementById('saveSettings');
         const cancelSettings = document.getElementById('cancelSettings');
+        
+        // Theme toggle button
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.toggleTheme();
+            });
+        }
         
         if (settingsBtn) {
             settingsBtn.addEventListener('click', (e) => {
@@ -1073,8 +1093,8 @@ class ChessUI {
                 return;
             }
             
-            // Apply theme
-            boardElement.className = `chess-board board-theme-${this.game.settings.boardTheme}`;
+            // Apply board theme + piece style class
+            boardElement.className = `chess-board board-theme-${this.game.settings.boardTheme} pieces-${this.game.settings.pieceStyle}`;
             
             boardElement.innerHTML = '';
             
@@ -1777,7 +1797,10 @@ class ChessUI {
             const showLegalMoves = document.getElementById('showLegalMoves');
             
             if (boardTheme) this.game.settings.boardTheme = boardTheme.value;
-            if (pieceStyle) this.game.settings.pieceStyle = pieceStyle.value;
+            if (pieceStyle) {
+                this.game.settings.pieceStyle = pieceStyle.value;
+                this.applyPieceStyle(pieceStyle.value);
+            }
             if (soundEffects) this.game.settings.soundEffects = soundEffects.value;
             if (showLegalMoves) this.game.settings.showLegalMoves = showLegalMoves.value;
             
@@ -1786,6 +1809,34 @@ class ChessUI {
         } catch (error) {
             console.error('Error saving settings:', error);
         }
+    }
+    
+    // ── Theme Methods ─────────────────────────────────────────────────────────
+    
+    initTheme() {
+        // Read persisted preference; fall back to OS preference
+        const saved = localStorage.getItem('chessmaster-theme');
+        let theme = saved;
+        if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        this.setTheme(theme);
+    }
+    
+    toggleTheme() {
+        const current = document.documentElement.dataset.colorScheme || 'light';
+        this.setTheme(current === 'dark' ? 'light' : 'dark');
+    }
+    
+    setTheme(theme) {
+        document.documentElement.dataset.colorScheme = theme;
+        localStorage.setItem('chessmaster-theme', theme);
+    }
+    
+    applyPieceStyle(style) {
+        const validStyles = ['classic', 'modern', 'letter'];
+        const resolved = validStyles.includes(style) ? style : 'classic';
+        this.game.pieceSymbols = this.game.pieceSymbolSets[resolved];
     }
 }
 

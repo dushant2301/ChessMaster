@@ -19,6 +19,10 @@
                     <button class="nav-btn" data-mode="puzzles">Puzzles</button>
                     <button class="nav-btn" data-mode="analysis">Analysis</button>
                     <button class="nav-btn" id="settingsBtn">Settings</button>
+                    <button class="nav-btn theme-toggle-btn" id="themeToggleBtn" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+                        <span class="theme-icon theme-icon--sun" aria-hidden="true">☀️</span>
+                        <span class="theme-icon theme-icon--moon" aria-hidden="true">🌙</span>
+                    </button>
                 </nav>
             </div>
         </div>
@@ -253,8 +257,9 @@
                 <div class="form-group">
                     <label class="form-label">Piece Style</label>
                     <select class="form-control" id="pieceStyle">
-                        <option value="standard" selected>Standard</option>
-                        <option value="classic">Classic</option>
+                        <option value="classic" selected>Classic — Unicode pieces</option>
+                        <option value="modern">Modern — 3D shaded pieces</option>
+                        <option value="letter">Letter — K/Q/R/B/N/P badges</option>
                     </select>
                 </div>
                 <div class="form-group">

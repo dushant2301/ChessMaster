@@ -825,6 +825,22 @@ select.form-control {
   color: var(--color-btn-primary-text);
 }
 
+/* Theme toggle button */
+.theme-toggle-btn {
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+/* Show/hide sun or moon based on current scheme.
+   Default (light mode): show moon (click to go dark).
+   Dark mode:            show sun (click to go light). */
+.theme-icon--moon { display: inline; }
+.theme-icon--sun  { display: none; }
+
+[data-color-scheme="dark"] .theme-icon--moon { display: none; }
+[data-color-scheme="dark"] .theme-icon--sun  { display: inline; }
+
 /* Main Container */
 .main-container {
   min-height: calc(100vh - 80px);
@@ -1155,6 +1171,62 @@ select.form-control {
 .chess-piece.black {
   color: #000000;
   text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* ── Piece Styles ─────────────────────────────────────────────────────────── */
+
+/* Modern style – same Unicode glyphs with a 3D shaded look */
+.pieces-modern .chess-piece {
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+}
+.pieces-modern .chess-piece.white {
+  color: #f5deb3;
+  -webkit-text-stroke: 1.5px #7a4e1a;
+  text-shadow: 2px 3px 6px rgba(0, 0, 0, 0.9),
+               0 1px 0 rgba(255, 255, 180, 0.4);
+}
+.pieces-modern .chess-piece.black {
+  color: #2c1a0e;
+  -webkit-text-stroke: 1.5px #c8a060;
+  text-shadow: 1px 2px 4px rgba(255, 255, 255, 0.25),
+               0 1px 0 rgba(200, 160, 80, 0.3);
+}
+
+/* Letter style – K/Q/R/B/N/P in circular badge buttons */
+.pieces-letter .chess-piece {
+  font-family: var(--font-family-base);
+  font-size: 17px;
+  font-weight: var(--font-weight-bold);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: none;
+  filter: none;
+  letter-spacing: 0;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.pieces-letter .chess-piece.white {
+  background: linear-gradient(145deg, #ffffff, #d8d8d8);
+  color: #1a1a1a;
+  border: 2px solid #888;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.8);
+  text-shadow: none;
+}
+.pieces-letter .chess-piece.black {
+  background: linear-gradient(145deg, #3a3a3a, #111111);
+  color: #f0f0f0;
+  border: 2px solid #666;
+  box-shadow: 2px 3px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+  text-shadow: none;
+}
+.pieces-letter .chess-piece:hover {
+  transform: scale(1.15);
+}
+.pieces-letter .chess-piece.dragging {
+  transform: scale(1.25);
 }
 
 /* Board Coordinates */
